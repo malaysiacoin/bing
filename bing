@@ -1,0 +1,276 @@
+const db = new ReplitDB();
+
+const buyButton = document.querySelector('#buy-button');
+const buttonContainer = document.querySelector('.button-container');
+const gridContainer = document.querySelector('.grid-container');
+
+let maxDigits = 2;
+let titles = [];
+
+buyButton.addEventListener('click', () => {
+    console.log('Buy button clicked');
+    buyButton.remove();
+    
+    const buttons = ['2D', '3D', '4D'];
+    
+    buttons.forEach((buttonText, index) => {
+        console.log('Creating new button:', buttonText);
+        const button = document.createElement('button');
+        button.textContent = buttonText;
+        buttonContainer.appendChild(button);
+        
+        button.addEventListener('click', () => {
+            console.log(buttonText, 'button clicked');
+            maxDigits = index + 2;
+            
+            if (buttonText === '2D') {
+                titles = ['$', '2A', '2B', '2C', '2D', '2E', '2N'];
+            } else if (buttonText === '3D') {
+                titles = ['$', '3A', '3B', '3C', '3D', '3E', '3N'];
+            } else if (buttonText === '4D') {
+                titles = ['$', 'B', 'S', '4A', '4B', '4C', '4D', '4E'];
+            }
+            
+            createGrid();
+        });
+    });
+});
+
+function createGrid() {
+    // Hide all buttons
+    const allButtons = document.querySelectorAll('.button-container button');
+    allButtons.forEach(button => {
+        button.style.display = 'none';
+    });
+    
+    gridContainer.innerHTML = '';
+    
+    const table = document.createElement('table');
+    
+    // Add title row
+    const titleTr = document.createElement('tr');
+    
+    titles.forEach(title => {
+        const th = document.createElement('th');
+        if (title === '$') {
+            th.textContent = maxDigits + 'D';
+        } else {
+            th.textContent = title;
+        }
+        titleTr.appendChild(th);
+    });
+    
+    table.appendChild(titleTr);
+    
+    for (let i = 0; i < 10; i++) {
+        const tr = document.createElement('tr');
+        
+        for (let j = 0; j < titles.length; j++) {
+            const td = document.createElement('td');
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.min = 0;
+            input.oninput = handleInput;
+            
+            // Set the id attribute for the input element
+            if (j === 0) {
+                input.id = `input-${i + 1}-${maxDigits}Di`;
+                input.maxLength = maxDigits;
+                input.size = maxDigits;
+            } else {
+                input.id = `input-${i + 1}-${titles[j]}`;
+            }
+            
+            td.appendChild(input);
+            tr.appendChild(td);
+        }
+        
+        table.appendChild(tr);
+    }
+    
+    const tr = document.createElement('tr');
+    tr.classList.add('button-row');
+    
+    const backButtonTd = document.createElement('td');
+    backButtonTd.colSpan = 2;
+    
+    const backButton = document.createElement('button');
+    backButton.textContent = 'Back';
+  
+            backButton.addEventListener('click', () => {
+        console.log('Back button clicked');
+        gridContainer.style.display = 'none';
+        
+        // Show all buttons
+        const allButtons = document.querySelectorAll('.button-container button');
+        allButtons.forEach(button => {
+            button.style.display = 'inline-block';
+        });
+    });
+
+    backButtonTd.appendChild(backButton);
+
+    const confirmButtonTd = document.createElement('td');
+    confirmButtonTd.colSpan = 2;
+    
+    const confirmButton = document.createElement('button');
+    confirmButton.textContent = 'Confirm';
+    confirmButton.addEventListener('click', () => {
+        console.log('Confirm button clicked');
+        printReceipt();
+    });
+    
+    confirmButtonTd.appendChild(confirmButton);
+    
+    const clearButtonTd = document.createElement('td');
+    clearButtonTd.colSpan = titles.length - 4;
+    
+    const clearButton = document.createElement('button');
+    clearButton.textContent = 'Clear';
+    clearButton.addEventListener('click', () => {
+        console.log('Clear button clicked');
+        const inputs = document.querySelectorAll('.grid-container input[type="number"]');
+        inputs.forEach(input => {
+            input.value = '';
+        });
+    });
+
+    clearButtonTd.appendChild(clearButton);
+
+    tr.appendChild(backButtonTd);
+    tr.appendChild(confirmButtonTd);
+    tr.appendChild(clearButtonTd);
+
+    table.appendChild(tr);
+
+    gridContainer.appendChild(table);
+    gridContainer.style.display = 'block';
+}
+
+function handleInput(event) {
+    const input = event.target;
+    const maxLength = input.getAttribute('maxLength');
+    
+    // Disallow non-numeric characters
+    input.value = input.value.replace(/[^0-9]/g, '');
+    
+    if (maxLength && input.value.length > maxLength) {
+        input.value = input.value.slice(0, maxLength);
+    }
+}
+
+async function printReceipt() {
+    const receiptPaper = document.querySelector('.receipt-paper');
+    receiptPaper.innerHTML = '';
+    
+    // Add title
+    const title = document.createElement('h2');
+    title.textContent = 'Draw Games 3.0';
+    title.style.textAlign = 'center';
+    receiptPaper.appendChild(title);
+    
+    // Add time
+    const time = document.createElement('p');
+    const currentTime = new Date().toLocaleString();
+    time.textContent = 'Time: ' + currentTime;
+    time.style.textAlign = 'center';
+    receiptPaper.appendChild(time);
+    
+    // Add ticket ID
+    const ticketId = document.createElement('p');
+    const currentTicketId = Math.floor(Math.random() * 1000000);
+    ticketId.textContent = 'Ticket ID: ' + currentTicketId;
+    ticketId.style.textAlign = 'center';
+    receiptPaper.appendChild(ticketId);
+    
+    // Add space
+    const space = document.createElement('br');
+    receiptPaper.appendChild(space);
+    
+    // Add codes
+    let codesString = '';
+    for (let i = 0; i < 10; i++) {
+        const numberInput = document.querySelector(`#input-${i + 1}-${maxDigits}Di`);
+        if (numberInput.value) {
+            const number = numberInput.value;
+            let codeString = `${number} = `;
+            
+            for (let j = 1; j < titles.length; j++) {
+                const typeInput = document.querySelector(`#input-${i + 1}-${titles[j]}`);
+                if (typeInput.value) {
+                    const type = titles[j];
+                    const quantity = typeInput.value;
+                    codeString += `${type}${quantity}- `;
+                }
+            }
+            
+            codeString = codeString.trim();
+            if (codeString !== `${number} =`) {
+                codesString += codeString + '\n';
+                const codeItem = document.createElement('p');
+                codeItem.textContent = codeString;
+                receiptPaper.appendChild(codeItem);
+            }
+        }
+    }
+
+    // Save data to database
+    await db.set(currentTicketId.toString(), {time: currentTime, codes: codesString});
+}
+
+async function populateTicketIds() {
+  // Get all keys from database
+  const keys = await db.list();
+  
+  // Create an option element for each key
+  keys.forEach(key => {
+      const optionElement = document.createElement('option');
+      optionElement.value = key;
+      optionElement.textContent = key;
+      ticketIdSelect.appendChild(optionElement);
+  });
+}
+
+populateTicketIds();
+
+ticketIdSelect.addEventListener('change', async event => {
+  // Get selected ticket ID
+  const selectedTicketId = event.target.value;
+
+  // Get data from database
+  const data = await db.get(selectedTicketId);
+
+  // Update content of receipt paper
+  const receiptPaper = document.querySelector('.receipt-paper');
+  receiptPaper.innerHTML = '';
+
+  // Add title
+  const titleElement = document.createElement('h2');
+  titleElement.textContent = 'Draw Games 3.0';
+  titleElement.style.textAlign = 'center';
+  receiptPaper.appendChild(titleElement);
+
+  // Add time
+  const timeElement = document.createElement('p');
+  timeElement.textContent = 'Time: ' + data.time;
+  timeElement.style.textAlign = 'center';
+  receiptPaper.appendChild(timeElement);
+
+  // Add ticket ID
+  const ticketIdElement = document.createElement('p');
+  ticketIdElement.textContent = 'Ticket ID: ' + selectedTicketId;
+  ticketIdElement.style.textAlign = 'center';
+  receiptPaper.appendChild(ticketIdElement);
+
+  // Add space
+  const spaceElement = document.createElement('br');
+  receiptPaper.appendChild(spaceElement);
+
+  // Add codes
+  const codes = data.codes.split('\n');
+  codes.forEach(code => {
+    const codeItem = document.createElement('p');
+    codeItem.textContent = code;
+    receiptPaper.appendChild(codeItem);
+  });
+});
