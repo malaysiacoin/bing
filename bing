@@ -1,263 +1,224 @@
-<!DOCTYPE html>
-<html>
-	<head><title>LIVE 3PM!!</title>
-	<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+$(function () {
+  var barrels,
+    barrelsSpinning = 0,
+    stopBarrels = false,
+    barrelsAnimationSpeed = 1000,
+    money = 0,
+    inRoll = false,
+    incrementInterval,
+    lastBetAmount = 0,
+    layoutType,
+    template,
+    errorTpl,
+    $container = $('#slots-container');
 
-<style>
-body {
+  function init() {
+    template = Handlebars.compile($('#slots-template').html());
+    errorTpl = Handlebars.compile($('#error-tpl').html());
+    $container.html(template());
 
-	margin: 0px;
-}
-</style>
-<link rel="stylesheet" href="/css/superj3.1.css">
-<link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
-<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    setEvents();
+    setupGame();
+  }
 
-<script>
-var numberFadeSpeed = 350;
-$(document).ready(function(){
-	
-	// Setup date picker
-	$('#viewdate').datepicker({
-		dateFormat: "dd/mm/yy",
-		showButtonPanel: false,
-		buttonText: "<>",
-		onClose: function() {
-			var url = "/index.php?id=1&r=d365Now";
-			$.post(url,{'viewDate':this.value}, function(data){
-				//alert("Data Loaded: " + data);
-				location.reload();
-			});
-		}	
-	}).on('change', function(){
-		$('.datepicker').hide();
-	});
-	
-	// Start Polling
-	doPoll();
-}); /* End $(document).ready */
+  var setEvents = function () {
+    $container.on('click', '.btn-sound', toggleSound);
+    $container.on('click', '.bet-btn', function () {
+      var betAmount = $(this).attr('data-bet');
+      if (!inRoll && !$(this).hasClass('disabled')) {
+        betButtonHandler(betAmount);
+      }
+    });
+    $container.on('click', '.btn-pay-table', function () {
+      $('.slots-area-wrap').toggleClass('table-act');
+    });
+  };
 
+  function setupGame() {
+    money = 1000; // Initial amount of money
+    barrelsAnimationSpeed = 1000; // Animation speed of the barrels
 
-function doPoll(){
-	$.ajax({
-			url:"/index.php?id=1&r=d365Now/polling",
-			method: "POST",
-			data: { "id" : 1 },
-			dataType: "json"
-	}).done(function(data) {
-//			console.log(data);
-//			console.log($.type(data));
+    moneyChanged();
+    checkButtons();
 
-		if(data['ERROR'] === "0") {
-			$('.message').html("");
-			
-			var arrG1 = data['DATA'][0];
+    barrels = [
+      new Barrel(0),
+      new Barrel(1),
+      new Barrel(2)
+    ];
+  }
 
-			if(data['DATA'][0]['DONE'] === "3") {
-				$("#idrs13").attr('class', '');
-				$('#idrs13').html("----");
-				$("#idrs3").attr('class', 'g1rs-3');
-			}
-			if(data['DATA'][0]['DONE'] === "2") {
-				$("#idrs12").attr('class', '');
-				$('#idrs12').html("----");
-				$("#idrs2").attr('class', 'g1rs-2');
-			}
-			if(data['DATA'][0]['DONE'] === "1") {
-				$("#idrs11").attr('class', '');
-				$('#idrs11').html("----");
-				$("#idrs1").attr('class', 'g1rs-1');
-			}
+  function betButtonHandler(betAmount) {
+    lastBetAmount = betAmount;
+    spinReels();
+    if (!inRoll) {
+      inRoll = true;
+      setTimeout(stopReels, 3000); // Stop the reels after 3 seconds (adjust timing as needed)
+    }
+  }
 
-			if(data['DATA'][0]['DONE'] === "99") {
-				$("#idrs13").attr('class', '');
-				$('#idrs13').html("----");
+  function spinReels() {
+    barrelsSpinning = 3;
+    barrels[0].spin();
+    barrels[1].spin();
+    barrels[2].spin();
+  }
 
-				$("#idrs3").attr('class', 'g1rs-3');
-				$("#idrs12").attr('class', '');
-				$('#idrs12').html("----");
-				$("#idrs2").attr('class', 'g1rs-2');
-				$("#idrs11").attr('class', '');
-				$('#idrs11').html("----");
-				$("#idrs1").attr('class', 'g1rs-1');
-			}
-			if(data['DATA'][0]['DONE'] === "0") {
+  function stopReels() {
+    stopBarrels = true;
+  }
 
-				$("#idrs3").attr('class', '');
-				$("#idrs3").html("----");
-				$("#idrs13").attr('class', 'g1rs-3');
-			//	$('#idrs13').html("----");
+  function displayResults() {
+    inRoll = false;
+    stopBarrels = false;
 
-				$("#idrs2").attr('class', '');
-				$("#idrs2").html("----");
-				$("#idrs12").attr('class', 'g1rs-2');
-			//	$('#idrs12').html("----");
+    var symbols = [];
+    for (var i = 0; i < barrels.length; i++) {
+      var symbol = barrels[i].stopAt;
+      symbols.push(symbol);
+    }
 
-				$("#idrs1").attr('class', '');
-				$("#idrs1").html("----");
-				$("#idrs11").attr('class', 'g1rs-1');
-			//	$('#idrs11').html("----");
-			}
+    var result = getResult(symbols);
+    var comboTitle = result.comboTitle;
+    var moneyWon = result.moneyWon;
 
+    if (moneyWon > 0) {
+      infoLog("You won $" + moneyWon + " with " + comboTitle);
+    } else {
+      infoLog("Try again!");
+    }
 
+    money += moneyWon;
+    moneyChanged();
+    checkButtons();
+  }
 
-			if(Object.keys(arrG1).length === 24) {
-				$.each(arrG1, function(vname, vvalue) {
-					//console.log(vname + ')' + vvalue);
-					
-					if(vname !== 'DONE') {
-						var curValue = $('.g1rs-'+vname).html();
-						var lastestValue = vvalue;
-						if(curValue !== lastestValue) {
-							// Show this result
-							updateNewResult($('.g1rs-'+vname), lastestValue);
-							console.log("Update "+vname+" from " + curValue +" to "+ lastestValue);
-						}
-					}
-				});
-			}
-		} else {
-			$('.message').html("ERROR: " +data['DESC']);
-		}
-		setTimeout(doPoll,8000);
-	})
-	.fail(function( jqXHR, textStatus ) {
-		//alert( "Network problem, request failed: " + textStatus );
-		$('.message').html("ERROR: " +data['DESC']);
-		setTimeout(doPoll,8000);
-	});
-}
+  function getResult(symbols) {
+    // Here you can define your own logic to determine the result based on the
+    // combination of symbols received. This can involve checking for matching symbols,
+    // special combinations, or any other rules specific to your game.
 
-function updateNewResult(target, value) 
-{
-	/*target.css('background-color','orange');*/
-	target.fadeOut(numberFadeSpeed, function() {
-		target.html(value);
-		target.fadeIn(numberFadeSpeed * 5, function() {	
-			target.css('background-color',''); 
-		});
-	});
-}
+    // Example logic for a simple winning combination
+    var winningCombination = ['A', 'A', 'A'];
+    var comboTitle = "No Win";
+    var moneyWon = 0;
 
+    if (symbols.join('') === winningCombination.join('')) {
+      comboTitle = "Jackpot!";
+      moneyWon = lastBetAmount * 10;
+    }
 
-/***** Clock running *****/
-var myVar = setInterval(function() { myTimer();}, 1000);
-function myTimer() {
-	document.getElementById("runningClock").innerHTML = (new Date()).toLocaleTimeString();
-}
-</script>
-</head>
-<body>
+    return { comboTitle: comboTitle, moneyWon: moneyWon };
+  }
 
-<div class="message" style="text-align: center; width: 100%; background-color: darkorange;"></div>
+  function moneyChanged() {
+    $container.find('#moneyAmount').text('$' + money);
+  }
 
-<table style="width: 100%" border="0">
-	<tr>
-		<td style="width: 34%">
-			
-			<table style="padding:2px">
-				<tr>
-					<td><div style="font-size: xx-large; font-weight: bold; width: 33%;
-   text-shadow: 3px 3px 2px #aaa;">3PM</div></td>
-				</tr>
-				<tr>
-					<td style="text-align: right; font-size: xx-small; color:gray">&#10145; <a href="http://9pm.superj3.win">9pm</a></td>
-				</tr>
-			</table>
-			
-		</td>
-		<td style="text-align: center;">
-			
-			<!--span style="font-size: x-large; font-weight: bold; font-style: italic">SuperJ3</span> - --> 
+  function checkButtons() {
+    $container.find('.bet-btn').each(function () {
+      var $button = $(this);
+      var betAmount = parseInt($button.attr('data-bet'));
+      $button.toggleClass('disabled', betAmount > money);
+    });
+  }
 
-			
-			<img style="vertical-align: middle; width: 80%" 
-								 src="/images/superj3-logo.png">
+  var Barrel = function (id) {
+    this.barrelID = id;
+    this.homeTop = this.location = 15;
+    this.$barrel = $container.find('#reel' + (this.barrelID + 1));
+    this.spinning = false;
+    this.stopAt = '';
 
-		</td>
-		
-		<td style="text-align: right; width: 33%">
-			<input id="viewdate" type="text" 
-				   value="08/07/2023" size="8" 
-				   style="text-align: center; font-weight: bold; cursor: default; border: 1px solid gray; background-color: white;
-				   transform: scaleY(1.2); 
-				   
-				   ">						
-		</td>
-	</tr>
-	<tr>
-		<td colspan="3" style="text-align: center; background-color: darkred; border: 1px solid black;">
-			<div style="color: white; font-weight:bold; font-size: medium">Live Draw <span id="runningClock">&nbsp;</span></div>
-		</td>
-	</tr>
+    var numItems = 3; // Number of symbols/items in the barrel
 
-</table>
+    for (var i = 0; i < numItems; i++) {
+      var $item = $('<div class="item"></div>');
+      this.$barrel.append($item);
+    }
 
-<div style="font-weight:bold; text-align: center;font-family: monospace; color: #db0413">&#11088; 3PM &#11088;</div>
+    this.$barrel.css('top', this.homeTop + 'px');
+  };
 
-<table border="0" style="width:100%">
-	<tr><td class="resultLabel" colspan="3">1st Prize</td>
-		<td class="result " colspan="2"><span id="idrs1" class="" style="color:#db0413; font-size: larger; font-weight: bolder">----</span>&nbsp;</td></tr>
+  Barrel.prototype.spin = function () {
+    var that = this;
+    if (that.spinning) return;
 
-	<tr><td class="resultLabel" colspan="3">2nd Prize</td>
-		<td class="result " colspan="2"><span id="idrs2" class="" style="color:#db0413; font-size: larger; font-weight: bolder">----</span>&nbsp;</td></tr>
+    that.spinning = true;
+    that.speed = 0;
 
-	<tr><td class="resultLabel" colspan="3">3rd Prize</td>
-		<td class="result " colspan="2"><span id="idrs3" class="">----</span>&nbsp;</td>
-	</tr>
+    var startTime = Date.now();
 
-	<tr><td class="resultLabel" colspan="5">Special</td></tr>
-	<tr>
-		<td class="result  "><span class="g1rs-4 ">----</span>&nbsp;</td>
-		<td class="result  "><span class="g1rs-5 ">----</span>&nbsp;</td>
-		<td class="result  "><span class="g1rs-6 ">----</span>&nbsp;</td>
-		<td class="result  "><span class="g1rs-7 ">----</span>&nbsp;</td>
-		<td class="result  "><span class="g1rs-8 ">----</span>&nbsp;</td>
-	</tr>
-	<tr>
-		<td class="result  "><span class="g1rs-9  ">----</span>&nbsp;</td>
-		<td class="result  "><span class="g1rs-10 ">----</span>&nbsp;</td>
-		<td class="result  "><span class="g1rs-11 ">----</span>&nbsp;</td>
-		<td class="result  "><span class="g1rs-12 ">----</span>&nbsp;</td>
-		<td class="result  "><span class="g1rs-13 ">----</span>&nbsp;</td>
-	</tr>
+    function frameUpdater() {
+      var timeDifference = Date.now() - startTime;
 
-	<tr class="row11-12-13">
-		<td class="result  " colspan="2"><span id="idrs11" class="g1rs-1">----</span>&nbsp;</td>
-		<td class="result  " colspan="1"><span id="idrs12" class="g1rs-2">----</span>&nbsp;</td>
-		<td class="result  " colspan="2"><span id="idrs13" class="g1rs-3">----</span>&nbsp;</td>
-	</tr>		
+      if (stopBarrels) {
+        var stopAt = getRandomItem();
+        that.stopAt = stopAt;
+        that.spinning = false;
+        that.$barrel.animate({ top: that.homeTop + "px" }, 400, 'easeOutBounce', animationFinished);
+        return;
+      }
 
+      if (that.loopTime <= timeDifference) {
+        var currentItem = getCurrentItem();
+        var nextItem = getNextItem(currentItem);
+        that.$barrel.animate({ top: nextItem + "px" }, 100, 'linear', frameUpdater);
+        return;
+      }
 
-	<tr><td class="resultLabel" colspan="5">Consolation</td></tr>
-	<tr>
-		<td class="result  "><span class="g1rs-14 ">----</span>&nbsp;</td>
-		<td class="result  "><span class="g1rs-15 ">----</span>&nbsp;</td>
-		<td class="result  "><span class="g1rs-16 ">----</span>&nbsp;</td>
-		<td class="result  "><span class="g1rs-17 ">----</span>&nbsp;</td>
-		<td class="result  "><span class="g1rs-18 ">----</span>&nbsp;</td>
-	</tr>
-	<tr>
-		<td class="result  "><span class="g1rs-19 ">----</span>&nbsp;</td>
-		<td class="result  "><span class="g1rs-20 ">----</span>&nbsp;</td>
-		<td class="result  "><span class="g1rs-21 ">----</span>&nbsp;</td>
-		<td class="result  "><span class="g1rs-22 ">----</span>&nbsp;</td>
-		<td class="result  "><span class="g1rs-23 ">----</span>&nbsp;</td>
-	</tr>
-</table>
+      var nextSpeed = (timeDifference / Barrel.MAX_SPEED_MS) * Barrel.MAX_SPEED;
+      that.speed = nextSpeed < Barrel.MAX_SPEED ? nextSpeed : Barrel.MAX_SPEED;
+      that.location += that.speed;
 
-<p>
-	<div style="text-align: center"></div>
-</p>
+      if (that.location >= that.homeTop) {
+        var currentItem = getCurrentItem();
+        var nextItem = getNextItem(currentItem);
+        that.$barrel.prepend(that.$barrel.children().last());
+        that.location = that.location % that.itemHeight - that.itemHeight;
+      }
 
+      that.$barrel.css('top', that.location + "px");
+      requestAnimationFrame(frameUpdater);
+    }
 
-<table style="width: 100%">
-	<tr>
-		<td style="vertical-align: top; text-align: center; color: #cccccc" nowrap><b>* Final result are base on final display</b></td>
-		<!--td style="text-align: right"><i style="font-weight: normal; font-size: small">Powered by</i><img style="width: 35%" src="/images/superj3-bg.png"></td-->
-	</tr>
-</table>
+    window.cancelAnimationFrame(that.spinerRequestFrameId);
+    frameUpdater();
+  };
 
-</body>
-</html>
+  function getRandomItem() {
+    var items = ['A', 'B', 'C']; // Replace with your symbols/items
+    var randomIndex = Math.floor(Math.random() * items.length);
+    return items[randomIndex];
+  }
+
+  function getCurrentItem() {
+    var $items = $container.find('#reel' + that.barrelID.toString() + ' .item');
+    var currentItem = $items.first().css('top');
+    return parseFloat(currentItem);
+  }
+
+  function getNextItem(currentItem) {
+    var itemHeight = $container.find('#reel' + that.barrelID.toString() + ' .item').height();
+    return (currentItem + itemHeight) % (itemHeight * 3);
+  }
+
+  function animationFinished() {
+    barrelsSpinning--;
+    if (barrelsSpinning === 0) {
+      displayResults();
+    }
+  }
+
+  function infoLog(message, size) {
+    $container.find('#gameResult').text(message);
+  }
+
+  function toggleSound() {
+    // Add your sound toggle logic here
+    console.log("Sound toggle");
+  }
+
+  // Initialize the game
+  init();
+});
